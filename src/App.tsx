@@ -18,6 +18,8 @@ function App() {
   const [activePatientName, setActivePatientName] = useState<string>('Paciente Anônimo');
   const [activeResult, setActiveResult] = useState<InterpretationResult | null>(null);
   const [isSaved, setIsSaved] = useState<boolean>(false);
+  // Id do exame de histórico atualmente em exibição (null se for um exame novo, ainda não salvo)
+  const [activeExamId, setActiveExamId] = useState<string | null>(null);
 
   // Carrega chaves e histórico ao iniciar o app
   useEffect(() => {
@@ -41,15 +43,20 @@ function App() {
     setActivePatientName(patientName);
     setActiveResult(result);
     setIsSaved(false);
+    setActiveExamId(null);
   };
 
-  // Lida com o sucesso do escaneamento por OCR/AI
+  // Lida com o sucesso do escaneamento por OCR/AI.
+  // SEGURANÇA CLÍNICA: os valores extraídos NÃO vão direto para a interpretação.
+  // Eles pré-preenchem o formulário editável para que o médico confira/corrija
+  // cada parâmetro antes de gerar o diagnóstico (OCR/IA pode errar a leitura).
   const handleScanSuccess = (inputs: BloodGasInputs) => {
-    const result = interpretBloodGas(inputs);
     setActiveInputs(inputs);
     setActivePatientName("Paciente Escaneado");
-    setActiveResult(result);
+    setActiveResult(null);
     setIsSaved(false);
+    setActiveExamId(null);
+    setActiveTab('input');
   };
 
   // Salva exame ativo no histórico do localStorage
@@ -68,6 +75,7 @@ function App() {
     setHistory(updatedHistory);
     localStorage.setItem('gasometria_history', JSON.stringify(updatedHistory));
     setIsSaved(true);
+    setActiveExamId(newSavedExam.id);
   };
 
   // Carrega exame antigo do histórico para exibição
@@ -76,6 +84,7 @@ function App() {
     setActivePatientName(exam.patientName);
     setActiveResult(exam.result);
     setIsSaved(true); // Já estava salvo
+    setActiveExamId(exam.id);
   };
 
   // Deleta exame do histórico
@@ -83,11 +92,12 @@ function App() {
     const updatedHistory = history.filter(item => item.id !== id);
     setHistory(updatedHistory);
     localStorage.setItem('gasometria_history', JSON.stringify(updatedHistory));
-    
-    // Se o exame deletado for o ativo em exibição, limpa a exibição
-    if (activeResult && activeInputs && history.find(h => h.id === id)?.date) {
+
+    // Só limpa a exibição se o exame deletado for EXATAMENTE o que está sendo exibido
+    if (activeExamId === id) {
       setActiveResult(null);
       setActiveInputs(null);
+      setActiveExamId(null);
     }
   };
 
@@ -98,6 +108,7 @@ function App() {
       localStorage.removeItem('gasometria_history');
       setActiveResult(null);
       setActiveInputs(null);
+      setActiveExamId(null);
     }
   };
 

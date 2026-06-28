@@ -204,66 +204,87 @@ export function interpretBloodGas(inputs: BloodGasInputs): InterpretationResult 
     }
   } else if (hasSingleRespiratory) {
     if (isRespiratoryAcidosis) {
-      // Na acidose respiratória avaliamos resposta aguda vs crônica
-      // Agudo: +1 mEq/L HCO3 para cada +10 pCO2 acima de 40
-      // Crônico: +3.5 mEq/L HCO3 para cada +10 pCO2 acima de 40
+      // Acidose respiratória: a compensação renal vai do "agudo" (mínima) ao "crônico" (máxima).
+      // Agudo: +1 mEq/L HCO₃⁻ a cada +10 de pCO₂ acima de 40
+      // Crônico: +3.5 mEq/L HCO₃⁻ a cada +10 de pCO₂ acima de 40
       const deltaPco2 = Math.max(0, pCO2 - 40);
       const hco3Acute = 24 + (1 * deltaPco2) / 10;
       const hco3Chronic = 24 + (3.5 * deltaPco2) / 10;
 
-      // Verificamos qual compensação o HCO3 observado está mais próximo
-      const diffAcute = Math.abs(HCO3 - hco3Acute);
-      const diffChronic = Math.abs(HCO3 - hco3Chronic);
-      const isChronic = diffChronic < diffAcute;
+      // Faixa de compensação renal APROPRIADA: do esperado agudo (−2) ao crônico (+2).
+      // HCO₃⁻ entre o agudo e o crônico NÃO é um distúrbio metabólico associado —
+      // é compensação parcial/em curso (perfil agudizado sobre crônico).
+      const bandLow = hco3Acute - 2;     // < bandLow → acidose metabólica concomitante
+      const bandHigh = hco3Chronic + 2;  // > bandHigh → alcalose metabólica concomitante
 
-      const expectedVal = isChronic ? hco3Chronic : hco3Acute;
-      const minExp = expectedVal - 2;
-      const maxExp = expectedVal + 2;
+      let phase: 'Agudo' | 'Crônico' | 'Agudo sobre Crônico';
+      if (HCO3 <= hco3Acute + 2) phase = 'Agudo';
+      else if (HCO3 >= hco3Chronic - 2) phase = 'Crônico';
+      else phase = 'Agudo sobre Crônico';
 
       compensation = {
-        isCompensated: HCO3 >= minExp && HCO3 <= maxExp,
-        status: HCO3 > maxExp ? 'excessive' : HCO3 < minExp ? 'insufficient' : 'adequate',
+        isCompensated: HCO3 >= bandLow && HCO3 <= bandHigh,
+        status: HCO3 > bandHigh ? 'excessive' : HCO3 < bandLow ? 'insufficient' : 'adequate',
         observed: HCO3,
-        expectedMin: Math.round(minExp * 10) / 10,
-        expectedMax: Math.round(maxExp * 10) / 10,
+        expectedMin: Math.round(bandLow * 10) / 10,
+        expectedMax: Math.round(bandHigh * 10) / 10,
         expectedValueText: `Agudo: ${Math.round((hco3Acute - 2) * 10) / 10}-${Math.round((hco3Acute + 2) * 10) / 10} | Crônico: ${Math.round((hco3Chronic - 2) * 10) / 10}-${Math.round((hco3Chronic + 2) * 10) / 10} mEq/L`,
-        formulaUsed: `Esperado (${isChronic ? 'Crônico' : 'Agudo'}): HCO₃⁻ = 24 + ${isChronic ? '3.5' : '1'} × (pCO₂ - 40)/10 ± 2`
+        formulaUsed: phase === 'Agudo sobre Crônico'
+          ? 'HCO₃⁻ entre a compensação aguda e a crônica: compatível com Acidose Respiratória agudizada sobre crônica (compensação renal parcial, sem distúrbio metabólico associado).'
+          : `Esperado (${phase}): HCO₃⁻ = 24 + ${phase === 'Crônico' ? '3.5' : '1'} × (pCO₂ − 40)/10 ± 2`
       };
 
-      if (HCO3 > maxExp) {
-        subDisturbances.push("Alcalose Metabólica Associada (elevação de HCO₃⁻ maior que a compensação renal esperada)");
-      } else if (HCO3 < minExp) {
-        subDisturbances.push("Acidose Metabólica Associada (elevação de HCO₃⁻ menor que o esperado para a compensação)");
+      // Enriquece o diagnóstico com a fase, sem sobrescrever rótulos já mais específicos (pH normal)
+      if (primaryDisorder === 'Acidose Respiratória') {
+        primaryDisorder = phase === 'Agudo sobre Crônico'
+          ? 'Acidose Respiratória Agudizada sobre Crônica'
+          : `Acidose Respiratória ${phase === 'Crônico' ? 'Crônica' : 'Aguda'}`;
+      }
+
+      if (HCO3 > bandHigh) {
+        subDisturbances.push("Alcalose Metabólica Associada (HCO₃⁻ acima até da compensação renal crônica máxima esperada)");
+      } else if (HCO3 < bandLow) {
+        subDisturbances.push("Acidose Metabólica Associada (HCO₃⁻ abaixo da compensação aguda mínima esperada)");
       }
     } else if (isRespiratoryAlkalosis) {
-      // Agudo: -2 mEq/L HCO3 para cada -10 pCO2 abaixo de 40 (limite inferior ~18)
-      // Crônico: -5 mEq/L HCO3 para cada -10 pCO2 abaixo de 40 (limite inferior ~12-14)
+      // Alcalose respiratória: compensação renal vai do "agudo" (queda mínima) ao "crônico" (queda máxima).
+      // Agudo: −2 mEq/L HCO₃⁻ a cada −10 de pCO₂ abaixo de 40 (piso ~18)
+      // Crônico: −5 mEq/L HCO₃⁻ a cada −10 de pCO₂ abaixo de 40 (piso ~12-14)
       const deltaPco2 = Math.max(0, 40 - pCO2);
       const hco3Acute = Math.max(18, 24 - (2 * deltaPco2) / 10);
       const hco3Chronic = Math.max(12, 24 - (5 * deltaPco2) / 10);
 
-      const diffAcute = Math.abs(HCO3 - hco3Acute);
-      const diffChronic = Math.abs(HCO3 - hco3Chronic);
-      const isChronic = diffChronic < diffAcute;
+      // Faixa apropriada: do crônico (−2, mais baixo) ao agudo (+2, mais alto)
+      const bandLow = hco3Chronic - 2;   // < bandLow → acidose metabólica concomitante
+      const bandHigh = hco3Acute + 2;    // > bandHigh → alcalose metabólica concomitante
 
-      const expectedVal = isChronic ? hco3Chronic : hco3Acute;
-      const minExp = expectedVal - 2;
-      const maxExp = expectedVal + 2;
+      let phase: 'Agudo' | 'Crônico' | 'Agudo sobre Crônico';
+      if (HCO3 >= hco3Acute - 2) phase = 'Agudo';
+      else if (HCO3 <= hco3Chronic + 2) phase = 'Crônico';
+      else phase = 'Agudo sobre Crônico';
 
       compensation = {
-        isCompensated: HCO3 >= minExp && HCO3 <= maxExp,
-        status: HCO3 > maxExp ? 'insufficient' : HCO3 < minExp ? 'excessive' : 'adequate', // Para alcalose resp, menor HCO3 = mais compensação renal
+        isCompensated: HCO3 >= bandLow && HCO3 <= bandHigh,
+        status: HCO3 > bandHigh ? 'excessive' : HCO3 < bandLow ? 'insufficient' : 'adequate',
         observed: HCO3,
-        expectedMin: Math.round(minExp * 10) / 10,
-        expectedMax: Math.round(maxExp * 10) / 10,
+        expectedMin: Math.round(bandLow * 10) / 10,
+        expectedMax: Math.round(bandHigh * 10) / 10,
         expectedValueText: `Agudo: ${Math.round((hco3Acute - 2) * 10) / 10}-${Math.round((hco3Acute + 2) * 10) / 10} | Crônico: ${Math.round((hco3Chronic - 2) * 10) / 10}-${Math.round((hco3Chronic + 2) * 10) / 10} mEq/L`,
-        formulaUsed: `Esperado (${isChronic ? 'Crônico' : 'Agudo'}): HCO₃⁻ = 24 - ${isChronic ? '5' : '2'} × (40 - pCO₂)/10 ± 2`
+        formulaUsed: phase === 'Agudo sobre Crônico'
+          ? 'HCO₃⁻ entre a compensação aguda e a crônica: compatível com Alcalose Respiratória em transição aguda→crônica (sem distúrbio metabólico associado).'
+          : `Esperado (${phase}): HCO₃⁻ = 24 − ${phase === 'Crônico' ? '5' : '2'} × (40 − pCO₂)/10 ± 2`
       };
 
-      if (HCO3 > maxExp) {
-        subDisturbances.push("Alcalose Metabólica Associada (queda de HCO₃⁻ menor do que a compensação esperada)");
-      } else if (HCO3 < minExp) {
-        subDisturbances.push("Acidose Metabólica Associada (queda de HCO₃⁻ maior que a compensação renal esperada)");
+      if (primaryDisorder === 'Alcalose Respiratória') {
+        primaryDisorder = phase === 'Agudo sobre Crônico'
+          ? 'Alcalose Respiratória (transição aguda→crônica)'
+          : `Alcalose Respiratória ${phase === 'Crônico' ? 'Crônica' : 'Aguda'}`;
+      }
+
+      if (HCO3 > bandHigh) {
+        subDisturbances.push("Alcalose Metabólica Associada (HCO₃⁻ acima do esperado para a compensação renal)");
+      } else if (HCO3 < bandLow) {
+        subDisturbances.push("Acidose Metabólica Associada (HCO₃⁻ abaixo até da compensação renal crônica máxima)");
       }
     }
   }

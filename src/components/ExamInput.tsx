@@ -248,11 +248,11 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
             </span>
           </div>
           <div className="slider-wrapper">
-            <input 
-              type="range" 
-              min="10" 
-              max="100" 
-              step="1" 
+            <input
+              type="range"
+              min="10"
+              max="150"
+              step="1"
               value={pCO2}
               onChange={(e) => setPco2(parseInt(e.target.value))}
             />
@@ -306,11 +306,11 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
             <span className="slider-value-badge">{pO2}</span>
           </div>
           <div className="slider-wrapper">
-            <input 
-              type="range" 
-              min="10" 
-              max="200" 
-              step="1" 
+            <input
+              type="range"
+              min="10"
+              max="400"
+              step="1"
               value={pO2}
               onChange={(e) => setPo2(parseInt(e.target.value))}
             />

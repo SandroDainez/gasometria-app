@@ -49,7 +49,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
         const prompt = `Você é um extrator de dados médicos estruturados especializado em exames de gasometria arterial e venosa. Sua tarefa é analisar a imagem do exame fornecida e extrair os valores numéricos exatos de cada parâmetro. Retorne APENAS um objeto JSON válido, sem formatação markdown (sem \`\`\`json), com os seguintes campos (use null se o parâmetro não estiver visível ou não existir no exame):\n{\n  "type": "arterial" ou "venous" (tente identificar a origem pelo contexto, ex: se pO2 < 50 e SatO2 < 80, ou se constar "venosa", marque "venous"; caso contrário, padrão é "arterial"),\n  "pH": número decimal (ex: 7.42),\n  "pCO2": número inteiro/decimal (ex: 40),\n  "pO2": número inteiro/decimal (ex: 90),\n  "HCO3": número decimal (ex: 24.5),\n  "BE": número decimal (ex: -1.2),\n  "SatO2": número inteiro/decimal (ex: 98),\n  "Na": número inteiro/decimal ou null,\n  "Cl": número inteiro/decimal ou null,\n  "K": número inteiro/decimal ou null,\n  "Albumin": número decimal ou null,\n  "FiO2": número inteiro/decimal ou null\n}`;
 
         const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
           {
             method: 'POST',
             headers: {
@@ -259,7 +259,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
           </div>
 
           <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            Confirme os parâmetros extraídos do exame antes de prosseguir com a interpretação clínica:
+            Estes são os parâmetros lidos pela leitura automática. A leitura por OCR/IA pode conter erros —
+            ao continuar, você poderá <strong>conferir e corrigir cada valor</strong> no formulário antes de gerar a interpretação:
           </p>
 
           <div style={{
@@ -321,10 +322,10 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
             </button>
             <button 
               onClick={handleConfirm}
-              className="btn-primary" 
+              className="btn-primary"
               style={{ flex: 1, padding: '12px' }}
             >
-              Interpretar Dados
+              Revisar e Corrigir
             </button>
           </div>
         </div>

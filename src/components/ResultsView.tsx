@@ -214,7 +214,7 @@ export const ResultsView = ({
                 marginTop: '6px'
               }}>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
-                  RELAÇÃO DELTA-DELTA (\(\Delta AG / \Delta HCO_3^-\))
+                  RELAÇÃO DELTA-DELTA (ΔAG / ΔHCO₃⁻)
                 </span>
                 <p style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{deltaDelta.text}</p>
               </div>
@@ -300,6 +300,26 @@ export const ResultsView = ({
             </div>
           ))}
         </div>
+      </div>
+
+      {/* 8. Aviso Médico / Disclaimer */}
+      <div style={{
+        display: 'flex',
+        gap: '10px',
+        alignItems: 'flex-start',
+        background: 'rgba(245, 158, 11, 0.05)',
+        border: '1px solid rgba(245, 158, 11, 0.18)',
+        borderRadius: 'var(--radius-md)',
+        padding: '14px'
+      }}>
+        <ShieldAlert size={16} color="var(--color-warning)" style={{ flexShrink: 0, marginTop: '2px' }} />
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 }}>
+          <strong style={{ color: 'var(--text-secondary)' }}>Aviso:</strong> Esta é uma ferramenta de <strong>apoio à decisão</strong> e
+          fins educacionais. Os cálculos e condutas seguem fórmulas e diretrizes consagradas (Marino, West, ATS/ERS),
+          mas <strong>não substituem o julgamento clínico</strong>, o exame do paciente nem a correlação com a história e demais exames.
+          Confira os valores inseridos e a coerência do resultado antes de qualquer decisão terapêutica.
+          A responsabilidade pela conduta é sempre do profissional assistente.
+        </p>
       </div>
 
     </div>
