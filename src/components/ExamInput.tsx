@@ -8,6 +8,50 @@ interface ExamInputProps {
   initialInputs?: BloodGasInputs | null;
 }
 
+interface ValueInputProps {
+  value: number;
+  onChange: (n: number) => void;
+  ariaLabel: string;
+  abnormal?: boolean; // undefined = sem destaque de cor (ex: pO₂, SatO₂)
+}
+
+/**
+ * Campo numérico editável por digitação, sincronizado com o slider.
+ * Mantém um rascunho em texto para permitir digitar decimais (ex: "7.28")
+ * e valores fora da faixa do slider (casos graves) sem travar a edição.
+ */
+const ValueInput: React.FC<ValueInputProps> = ({ value, onChange, ariaLabel, abnormal }) => {
+  const [draft, setDraft] = useState<string>(String(value));
+
+  // Sincroniza o rascunho quando o valor externo muda (slider, preset, OCR)
+  useEffect(() => {
+    if (parseFloat(draft) !== value) setDraft(String(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const colorClass = abnormal === undefined ? '' : abnormal ? ' abnormal' : ' normal';
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      aria-label={ariaLabel}
+      className={`slider-value-badge${colorClass}`}
+      style={{ width: '80px', textAlign: 'right', fontFamily: 'monospace', cursor: 'text' }}
+      value={draft}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setDraft(raw);
+        const v = parseFloat(raw);
+        if (!Number.isNaN(v)) onChange(v);
+      }}
+      onBlur={() => {
+        const v = parseFloat(draft);
+        setDraft(Number.isNaN(v) ? String(value) : String(v));
+      }}
+    />
+  );
+};
+
 export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs }) => {
   const [patientName, setPatientName] = useState('');
   const [type, setType] = useState<ExamType>('arterial');
@@ -223,9 +267,7 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
         <div className="slider-group">
           <div className="slider-header">
             <span className="slider-label">pH</span>
-            <span className={`slider-value-badge ${isPhAbnormal ? 'abnormal' : 'normal'}`}>
-              {pH.toFixed(2)}
-            </span>
+            <ValueInput value={pH} onChange={setPh} ariaLabel="pH" abnormal={isPhAbnormal} />
           </div>
           <div className="slider-wrapper">
             <input 
@@ -243,16 +285,14 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
         <div className="slider-group">
           <div className="slider-header">
             <span className="slider-label">pCO₂ <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(mmHg)</span></span>
-            <span className={`slider-value-badge ${isPco2Abnormal ? 'abnormal' : 'normal'}`}>
-              {pCO2}
-            </span>
+            <ValueInput value={pCO2} onChange={setPco2} ariaLabel="pCO2 em mmHg" abnormal={isPco2Abnormal} />
           </div>
           <div className="slider-wrapper">
-            <input 
-              type="range" 
-              min="10" 
-              max="100" 
-              step="1" 
+            <input
+              type="range"
+              min="10"
+              max="150"
+              step="1"
               value={pCO2}
               onChange={(e) => setPco2(parseInt(e.target.value))}
             />
@@ -263,9 +303,7 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
         <div className="slider-group">
           <div className="slider-header">
             <span className="slider-label">HCO₃⁻ <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(mEq/L)</span></span>
-            <span className={`slider-value-badge ${isHco3Abnormal ? 'abnormal' : 'normal'}`}>
-              {HCO3.toFixed(1)}
-            </span>
+            <ValueInput value={HCO3} onChange={setHco3} ariaLabel="HCO3 em mEq/L" abnormal={isHco3Abnormal} />
           </div>
           <div className="slider-wrapper">
             <input 
@@ -283,9 +321,7 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
         <div className="slider-group">
           <div className="slider-header">
             <span className="slider-label">Base Excess (BE) <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(mEq/L)</span></span>
-            <span className={`slider-value-badge ${isBeAbnormal ? 'abnormal' : 'normal'}`}>
-              {BE > 0 ? `+${BE}` : BE}
-            </span>
+            <ValueInput value={BE} onChange={setBe} ariaLabel="Base Excess em mEq/L" abnormal={isBeAbnormal} />
           </div>
           <div className="slider-wrapper">
             <input 
@@ -303,14 +339,14 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
         <div className="slider-group">
           <div className="slider-header">
             <span className="slider-label">pO₂ <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(mmHg)</span></span>
-            <span className="slider-value-badge">{pO2}</span>
+            <ValueInput value={pO2} onChange={setPo2} ariaLabel="pO2 em mmHg" />
           </div>
           <div className="slider-wrapper">
-            <input 
-              type="range" 
-              min="10" 
-              max="200" 
-              step="1" 
+            <input
+              type="range"
+              min="10"
+              max="400"
+              step="1"
               value={pO2}
               onChange={(e) => setPo2(parseInt(e.target.value))}
             />
@@ -321,7 +357,7 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
         <div className="slider-group" style={{ marginBottom: 0 }}>
           <div className="slider-header">
             <span className="slider-label">SatO₂ <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(%)</span></span>
-            <span className="slider-value-badge">{SatO2}%</span>
+            <ValueInput value={SatO2} onChange={setSatO2} ariaLabel="Saturação de O2 em %" />
           </div>
           <div className="slider-wrapper">
             <input 
