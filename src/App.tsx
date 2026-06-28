@@ -6,7 +6,7 @@ import { ExamInput } from './components/ExamInput';
 import { CameraScanner } from './components/CameraScanner';
 import { ResultsView } from './components/ResultsView';
 import { HistoryView } from './components/HistoryView';
-import { Edit3, Camera, History } from 'lucide-react';
+import { Edit3, Camera, History, ShieldAlert } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'input' | 'scanner' | 'history'>('input');
@@ -161,6 +161,26 @@ function App() {
               />
             )}
           </>
+        )}
+
+        {/* Aviso permanente nas telas de entrada/scanner/histórico
+            (a tela de resultados já exibe o aviso detalhado) */}
+        {!activeResult && (
+          <footer style={{
+            marginTop: 'auto',
+            paddingTop: '12px',
+            borderTop: '1px solid var(--border-color)',
+            display: 'flex',
+            gap: '8px',
+            alignItems: 'flex-start'
+          }}>
+            <ShieldAlert size={13} color="var(--color-warning)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <p style={{ fontSize: '10.5px', color: 'var(--text-muted)', lineHeight: 1.45, margin: 0 }}>
+              <strong style={{ color: 'var(--text-secondary)' }}>Ferramenta de apoio à decisão clínica.</strong> A
+              interpretação e a <strong>decisão final são de responsabilidade do profissional de saúde</strong>,
+              considerando o exame físico, a história e o contexto do paciente. Não substitui o julgamento médico.
+            </p>
+          </footer>
         )}
       </main>
 
