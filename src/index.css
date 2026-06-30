@@ -231,31 +231,65 @@ html {
   gap: 12px;
 }
 
+/* Trilho com altura de toque grande (36px) mas track fino visível — facilita
+   pegar e arrastar a bolinha com precisão, principalmente no celular. */
 input[type="range"] {
   -webkit-appearance: none;
+  appearance: none;
   width: 100%;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
+  height: 36px;
+  background: transparent;
   outline: none;
+  cursor: pointer;
+  touch-action: none;
+}
+
+/* Track visível — Chrome / Safari / Edge */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
   transition: background var(--transition-fast);
 }
 
+/* Thumb — Chrome / Safari / Edge (margin-top centraliza no track de 10px) */
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 20px;
-  height: 20px;
+  width: 30px;
+  height: 30px;
+  margin-top: -10px;
   border-radius: 50%;
   background: var(--text-primary);
-  border: 2px solid var(--primary);
-  box-shadow: 0 0 8px rgba(99, 102, 241, 0.5);
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.55);
   cursor: pointer;
   transition: transform var(--transition-fast);
 }
 
 input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
+  transform: scale(1.12);
+}
+
+input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+/* Track e thumb — Firefox */
+input[type="range"]::-moz-range-track {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  border: 3px solid var(--primary);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.55);
+  cursor: pointer;
 }
 
 /* Custom Text Inputs */

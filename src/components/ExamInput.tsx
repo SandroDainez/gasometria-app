@@ -306,11 +306,11 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
             <ValueInput value={HCO3} onChange={setHco3} ariaLabel="HCO3 em mEq/L" abnormal={isHco3Abnormal} />
           </div>
           <div className="slider-wrapper">
-            <input 
-              type="range" 
-              min="2.0" 
-              max="50.0" 
-              step="0.5" 
+            <input
+              type="range"
+              min="2.0"
+              max="50.0"
+              step="0.1"
               value={HCO3}
               onChange={(e) => setHco3(parseFloat(e.target.value))}
             />
