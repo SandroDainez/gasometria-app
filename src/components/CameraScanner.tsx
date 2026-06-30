@@ -9,11 +9,50 @@ interface CameraScannerProps {
   onScanSuccess: (inputs: BloodGasInputs) => void;
 }
 
+// Parâmetros clínicos que contam como "leitura bem-sucedida"
+const CORE_KEYS: (keyof BloodGasInputs)[] = ['pH', 'pCO2', 'pO2', 'HCO3', 'BE', 'SatO2', 'Na', 'Cl', 'K'];
+
+/**
+ * A partir do que o OCR/IA conseguiu ler, monta um exame completo:
+ * preenche com valores padrão APENAS os parâmetros obrigatórios que faltaram,
+ * para que a leitura parcial não vire um beco sem saída — o usuário confere e
+ * corrige tudo no formulário. Retorna null se NADA clínico foi reconhecido.
+ */
+function finalizeExtraction(
+  parsed: Partial<BloodGasInputs>
+): { final: BloodGasInputs; detected: string[] } | null {
+  const detected = CORE_KEYS.filter((k) => parsed[k] !== undefined) as string[];
+  if (detected.length === 0) return null;
+
+  const type = parsed.type ?? 'arterial';
+  const d = type === 'venous'
+    ? { pH: 7.35, pCO2: 46, pO2: 35, HCO3: 24, BE: 0, SatO2: 70 }
+    : { pH: 7.40, pCO2: 40, pO2: 90, HCO3: 24, BE: 0, SatO2: 98 };
+
+  const final: BloodGasInputs = {
+    type,
+    pH: parsed.pH ?? d.pH,
+    pCO2: parsed.pCO2 ?? d.pCO2,
+    pO2: parsed.pO2 ?? d.pO2,
+    HCO3: parsed.HCO3 ?? d.HCO3,
+    BE: parsed.BE ?? d.BE,
+    SatO2: parsed.SatO2 ?? d.SatO2,
+    Na: parsed.Na,
+    Cl: parsed.Cl,
+    K: parsed.K,
+    Albumin: parsed.Albumin,
+    FiO2: parsed.FiO2,
+    Age: parsed.Age,
+  };
+  return { final, detected };
+}
+
 export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [detectedValues, setDetectedValues] = useState<Partial<BloodGasInputs> | null>(null);
+  const [detectedKeys, setDetectedKeys] = useState<string[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +77,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
     setLoading(true);
     setError(null);
     setDetectedValues(null);
+    setDetectedKeys([]);
 
     try {
       if (geminiKey) {
@@ -92,15 +132,12 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
           }
         });
 
-        // Valores mínimos obrigatórios para interpretação
-        if (cleanResult.pH !== undefined && cleanResult.pCO2 !== undefined && cleanResult.HCO3 !== undefined) {
-          // Garante fallback de outros obrigatórios
-          cleanResult.pO2 = cleanResult.pO2 ?? (cleanResult.type === 'venous' ? 35 : 90);
-          cleanResult.BE = cleanResult.BE ?? 0;
-          cleanResult.SatO2 = cleanResult.SatO2 ?? (cleanResult.type === 'venous' ? 70 : 98);
-          setDetectedValues(cleanResult);
+        const finalized = finalizeExtraction(cleanResult);
+        if (finalized) {
+          setDetectedValues(finalized.final);
+          setDetectedKeys(finalized.detected);
         } else {
-          throw new Error("O Gemini não conseguiu localizar os parâmetros básicos (pH, pCO₂ ou HCO₃⁻) na imagem. Tente tirar uma foto mais nítida.");
+          throw new Error("O Gemini não localizou nenhum parâmetro de gasometria nesta imagem. Verifique se a foto mostra os resultados do exame e está nítida.");
         }
 
       } else {
@@ -117,16 +154,14 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
 
         setProgress('Analisando texto...');
         const parsed = parseOcrText(text);
+        const finalized = finalizeExtraction(parsed);
 
-        if (parsed.pH !== undefined && parsed.pCO2 !== undefined && parsed.HCO3 !== undefined) {
-          // Garante fallback de outros obrigatórios
-          parsed.pO2 = parsed.pO2 ?? (parsed.type === 'venous' ? 35 : 90);
-          parsed.BE = parsed.BE ?? 0;
-          parsed.SatO2 = parsed.SatO2 ?? (parsed.type === 'venous' ? 70 : 98);
-          setDetectedValues(parsed);
+        if (finalized) {
+          setDetectedValues(finalized.final);
+          setDetectedKeys(finalized.detected);
         } else {
           console.log("Texto detectado:", text);
-          throw new Error("Não foi possível detectar parâmetros básicos do exame. Certifique-se de que a imagem é nítida, está bem iluminada e sem sombras, ou configure a Chave de API do Gemini nas configurações para leitura com inteligência artificial.");
+          throw new Error("A leitura local (OCR) não reconheceu valores nesta foto. Dicas: enquadre apenas a área dos resultados, com boa luz, sem reflexo e com a imagem reta. Para FOTOS, a leitura com IA é bem mais precisa — toque na engrenagem ⚙️ e configure uma Chave de API do Gemini (gratuita).");
         }
       }
     } catch (err: any) {
@@ -148,6 +183,13 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
       onScanSuccess(detectedValues as BloodGasInputs);
     }
   };
+
+  // Selo exibido ao lado de um valor que NÃO foi lido na imagem (preenchido com padrão)
+  const defaultTag = (
+    <span style={{ fontSize: '10px', fontWeight: 500, color: 'var(--color-warning)', marginLeft: '4px' }}>
+      (padrão)
+    </span>
+  );
 
   return (
     <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -255,12 +297,15 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
         <div className="glass-card active-normal" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
             <CheckCircle size={20} color="var(--color-normal)" />
-            <h4 style={{ fontSize: '15px', fontWeight: 600 }}>Leitura Concluída com Sucesso!</h4>
+            <h4 style={{ fontSize: '15px', fontWeight: 600 }}>
+              {detectedKeys.length} parâmetro{detectedKeys.length === 1 ? '' : 's'} reconhecido{detectedKeys.length === 1 ? '' : 's'}
+            </h4>
           </div>
 
           <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            Estes são os parâmetros lidos pela leitura automática. A leitura por OCR/IA pode conter erros —
-            ao continuar, você poderá <strong>conferir e corrigir cada valor</strong> no formulário antes de gerar a interpretação:
+            A leitura por OCR/IA pode conter erros. Os campos marcados como <strong>(padrão)</strong> não foram
+            reconhecidos na imagem e receberam um valor inicial — ao continuar, você poderá
+            <strong> conferir e corrigir cada valor</strong> no formulário antes de gerar a interpretação:
           </p>
 
           <div style={{
@@ -280,23 +325,23 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
             </div>
             <div style={{ fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>pH:</span>
-              <strong>{detectedValues.pH?.toFixed(2)}</strong>
+              <strong>{detectedValues.pH?.toFixed(2)}{!detectedKeys.includes('pH') && defaultTag}</strong>
             </div>
             <div style={{ fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>pCO₂:</span>
-              <strong>{detectedValues.pCO2} mmHg</strong>
+              <strong>{detectedValues.pCO2} mmHg{!detectedKeys.includes('pCO2') && defaultTag}</strong>
             </div>
             <div style={{ fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>HCO₃⁻:</span>
-              <strong>{detectedValues.HCO3?.toFixed(1)} mEq/L</strong>
+              <strong>{detectedValues.HCO3?.toFixed(1)} mEq/L{!detectedKeys.includes('HCO3') && defaultTag}</strong>
             </div>
             <div style={{ fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>pO₂:</span>
-              <strong>{detectedValues.pO2} mmHg</strong>
+              <strong>{detectedValues.pO2} mmHg{!detectedKeys.includes('pO2') && defaultTag}</strong>
             </div>
             <div style={{ fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--text-muted)' }}>SatO₂:</span>
-              <strong>{detectedValues.SatO2}%</strong>
+              <strong>{detectedValues.SatO2}%{!detectedKeys.includes('SatO2') && defaultTag}</strong>
             </div>
             {detectedValues.Na !== undefined && (
               <div style={{ fontSize: '13px', display: 'flex', justifyContent: 'space-between' }}>
@@ -314,8 +359,8 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
 
           <div style={{ display: 'flex', gap: '10px' }}>
             <button 
-              onClick={() => setDetectedValues(null)}
-              className="btn-secondary" 
+              onClick={() => { setDetectedValues(null); setDetectedKeys([]); }}
+              className="btn-secondary"
               style={{ flex: 1, padding: '12px' }}
             >
               <RefreshCw size={16} /> Refazer

@@ -49,3 +49,29 @@ test('Ignora valores claramente fora de faixa fisiológica', () => {
   assert.equal(r.pH, undefined);
   assert.equal(r.pCO2, 40);
 });
+
+test('Reconhece prefixo Pa (PaCO2/PaO2) e bicarbonato por extenso', () => {
+  const texto = 'pH 7.31\nPaCO2 52\nPaO2 68\nBicarbonato 25.0\nBE -2';
+  const r = parseOcrText(texto);
+  assert.equal(r.pH, 7.31);
+  assert.equal(r.pCO2, 52);
+  assert.equal(r.pO2, 68);
+  assert.equal(r.HCO3, 25.0);
+  assert.equal(r.BE, -2);
+});
+
+test('Tolera unidade/parênteses entre o rótulo e o valor', () => {
+  const texto = 'pCO2 (mmHg): 38\nHCO3- = 22.5\nSatO2 .... 95';
+  const r = parseOcrText(texto);
+  assert.equal(r.pCO2, 38);
+  assert.equal(r.HCO3, 22.5);
+  assert.equal(r.SatO2, 95);
+});
+
+test('pO2 não casa por engano dentro de "pCO2"', () => {
+  // Só há pCO2 no texto; pO2 deve ficar indefinido, não "roubar" o 44 do pCO2
+  const texto = 'pCO2: 44';
+  const r = parseOcrText(texto);
+  assert.equal(r.pCO2, 44);
+  assert.equal(r.pO2, undefined);
+});
