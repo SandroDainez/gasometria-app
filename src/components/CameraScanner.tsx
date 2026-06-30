@@ -12,6 +12,57 @@ interface CameraScannerProps {
 // Parâmetros clínicos que contam como "leitura bem-sucedida"
 const CORE_KEYS: (keyof BloodGasInputs)[] = ['pH', 'pCO2', 'pO2', 'HCO3', 'BE', 'SatO2', 'Na', 'Cl', 'K'];
 
+// Carrega um File como HTMLImageElement
+function loadImage(file: File): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = (e) => { URL.revokeObjectURL(url); reject(e); };
+    img.src = url;
+  });
+}
+
+/**
+ * Pré-processa a foto para melhorar MUITO o OCR local (Tesseract) em fotos de laudo:
+ * redimensiona para um tamanho ideal, converte para escala de cinza e aumenta o
+ * contraste. Retorna um canvas pronto para o Tesseract. Se algo falhar, devolve null
+ * (o chamador usa o arquivo original como fallback).
+ */
+async function preprocessForOcr(file: File): Promise<HTMLCanvasElement | null> {
+  try {
+    const img = await loadImage(file);
+    // Tesseract lê melhor com largura ~1500–2200px (nem minúsculo, nem foto gigante ruidosa)
+    const targetW = 2000;
+    const scale = img.width > targetW ? targetW / img.width : (img.width < 1000 ? 1000 / img.width : 1);
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, w, h);
+
+    const imageData = ctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+    const contrast = 1.45;            // realce de contraste
+    const intercept = 128 * (1 - contrast);
+    for (let i = 0; i < data.length; i += 4) {
+      // luminância (escala de cinza)
+      const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+      let v = gray * contrast + intercept;
+      v = v < 0 ? 0 : v > 255 ? 255 : v;
+      data[i] = data[i + 1] = data[i + 2] = v;
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * A partir do que o OCR/IA conseguiu ler, monta um exame completo:
  * preenche com valores padrão APENAS os parâmetros obrigatórios que faltaram,
@@ -141,10 +192,14 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
         }
 
       } else {
-        // --- MÉTODO 2: TESSERACT.JS (OCR LOCAL FALLBACK) ---
+        // --- MÉTODO 2: TESSERACT.JS (OCR LOCAL) ---
+        setProgress('Preparando imagem...');
+        // Pré-processa (cinza + contraste + redimensiona) — melhora muito o OCR em foto.
+        // Se falhar, usa o arquivo original.
+        const ocrInput = (await preprocessForOcr(file)) ?? file;
+
         setProgress('Carregando OCR local...');
-        
-        const { data: { text } } = await Tesseract.recognize(file, 'por', {
+        const { data: { text } } = await Tesseract.recognize(ocrInput, 'por', {
           logger: m => {
             if (m.status === 'recognizing text') {
               setProgress(`Reconhecendo texto: ${Math.round(m.progress * 100)}%`);
@@ -161,7 +216,7 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
           setDetectedKeys(finalized.detected);
         } else {
           console.log("Texto detectado:", text);
-          throw new Error("A leitura local (OCR) não reconheceu valores nesta foto. Dicas: enquadre apenas a área dos resultados, com boa luz, sem reflexo e com a imagem reta. Para FOTOS, a leitura com IA é bem mais precisa — toque na engrenagem ⚙️ e configure uma Chave de API do Gemini (gratuita).");
+          throw new Error("Não consegui ler os valores nesta foto. Para a leitura automática funcionar melhor: aproxime e enquadre só a área dos resultados, com boa luz, sem reflexo/sombra e com a foto reta (de frente). Vale também recortar a imagem antes. Se preferir, é rápido inserir os valores manualmente na aba Calculadora.");
         }
       }
     } catch (err: any) {
@@ -239,22 +294,23 @@ export const CameraScanner: React.FC<CameraScannerProps> = ({ geminiKey, onScanS
           </button>
         </div>
 
-        {/* Informação sobre Gemini Key */}
+        {/* Dicas para uma boa leitura local (OCR) */}
         {!geminiKey && (
           <div style={{
             display: 'flex',
             gap: '8px',
-            background: 'rgba(245, 158, 11, 0.05)',
-            border: '1px solid rgba(245, 158, 11, 0.15)',
+            background: 'rgba(99, 102, 241, 0.05)',
+            border: '1px solid rgba(99, 102, 241, 0.15)',
             padding: '12px',
             borderRadius: 'var(--radius-sm)',
             marginTop: '20px',
             textAlign: 'left',
             alignItems: 'flex-start'
           }}>
-            <AlertCircle size={16} color="var(--color-warning)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <AlertCircle size={16} color="var(--primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
-              <strong>Dica Premium:</strong> Você está usando OCR local. Para uma precisão absurdamente superior em qualquer tipo de laudo ou foto com sombras, configure uma **Chave de API do Gemini** clicando no ícone de engrenagem no topo.
+              <strong>Para uma boa leitura:</strong> aproxime e enquadre apenas a área dos resultados,
+              com boa luz, sem reflexo/sombra e com a foto reta (de frente). Recortar a imagem antes ajuda bastante.
             </span>
           </div>
         )}
