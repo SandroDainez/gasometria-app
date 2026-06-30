@@ -1,13 +1,12 @@
 import type { BloodGasInputs, InterpretationResult } from '../types';
-import { 
-  CheckSquare, 
-  Activity, 
-  ArrowLeft, 
-  Save, 
-  Heart, 
-  ShieldAlert, 
-  Percent, 
-  Droplet 
+import {
+  CheckSquare,
+  Activity,
+  ArrowLeft,
+  Heart,
+  ShieldAlert,
+  Percent,
+  Droplet
 } from 'lucide-react';
 
 interface ResultsViewProps {
@@ -15,17 +14,13 @@ interface ResultsViewProps {
   result: InterpretationResult;
   patientName: string;
   onBack: () => void;
-  onSave: () => void;
-  isSaved: boolean;
 }
 
 export const ResultsView = ({
   inputs,
   result,
   patientName,
-  onBack,
-  onSave,
-  isSaved
+  onBack
 }: ResultsViewProps) => {
   const { pH, type } = inputs;
   const { phClassification, primaryDisorder, subDisturbances, compensation, anionGap, deltaDelta, oxygenation, condutas, warnings } = result;
@@ -52,25 +47,10 @@ export const ResultsView = ({
   return (
     <div className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       
-      {/* Botão de Voltar / Ações do Topo */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      {/* Botão de Voltar */}
+      <div>
         <button onClick={onBack} className="btn-secondary" style={{ padding: '10px 16px' }}>
           <ArrowLeft size={16} /> Alterar Dados
-        </button>
-
-        <button 
-          onClick={onSave} 
-          className="btn-primary" 
-          disabled={isSaved}
-          style={{ 
-            padding: '10px 16px', 
-            fontSize: '14px',
-            background: isSaved ? 'var(--color-normal-glow)' : '',
-            color: isSaved ? 'var(--color-normal)' : '',
-            border: isSaved ? '1px solid rgba(16, 185, 129, 0.3)' : ''
-          }}
-        >
-          <Save size={16} /> {isSaved ? "Salvo no Histórico" : "Salvar no Histórico"}
         </button>
       </div>
 
