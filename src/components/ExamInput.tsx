@@ -163,6 +163,9 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
   const isPco2Abnormal = isAbnormal(pCO2, type === 'arterial' ? 35 : 41, type === 'arterial' ? 45 : 51);
   const isHco3Abnormal = isAbnormal(HCO3, type === 'arterial' ? 22 : 22, type === 'arterial' ? 26 : 28);
   const isBeAbnormal = BE < -2 || BE > 2;
+  // pO₂ e SatO₂ dependem do tipo: arterial (oxigenação normal) vs venoso (extração tecidual)
+  const isPo2Abnormal = isAbnormal(pO2, type === 'arterial' ? 80 : 30, type === 'arterial' ? 100 : 50);
+  const isSato2Abnormal = type === 'arterial' ? SatO2 < 95 : isAbnormal(SatO2, 60, 80);
 
   return (
     <form onSubmit={handleInterpret} className="animate-slide-up" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -339,7 +342,7 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
         <div className="slider-group">
           <div className="slider-header">
             <span className="slider-label">pO₂ <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(mmHg)</span></span>
-            <ValueInput value={pO2} onChange={setPo2} ariaLabel="pO2 em mmHg" />
+            <ValueInput value={pO2} onChange={setPo2} ariaLabel="pO2 em mmHg" abnormal={isPo2Abnormal} />
           </div>
           <div className="slider-wrapper">
             <input
@@ -357,7 +360,7 @@ export const ExamInput: React.FC<ExamInputProps> = ({ onSubmit, initialInputs })
         <div className="slider-group" style={{ marginBottom: 0 }}>
           <div className="slider-header">
             <span className="slider-label">SatO₂ <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>(%)</span></span>
-            <ValueInput value={SatO2} onChange={setSatO2} ariaLabel="Saturação de O2 em %" />
+            <ValueInput value={SatO2} onChange={setSatO2} ariaLabel="Saturação de O2 em %" abnormal={isSato2Abnormal} />
           </div>
           <div className="slider-wrapper">
             <input 
